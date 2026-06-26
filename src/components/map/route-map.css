@@ -1,0 +1,124 @@
+/* Route-vertex markers + map chrome for the floating-glass planner.
+ *
+ * IMPORTANT: MapLibre positions a marker by writing `transform: translate(...)`
+ * onto the element we hand it. If that element has a `transition: transform`,
+ * every map pan animates the translate and the marker visibly lags ("floats")
+ * behind the map. So the outer `.rm-marker` (MapLibre-controlled) carries NO
+ * transform/transition; all visuals + hover live on the inner `.rm-marker__dot`. */
+
+.rm-marker {
+  /* MapLibre does NOT add its `.maplibregl-marker` class to a custom marker
+     element, so it inherits no positioning. Without `position: absolute` the
+     elements stay in normal flow and stack vertically — MapLibre's transform
+     then offsets each from a baseline that's `index × height` too far down, so
+     dots drift below the line (worse the more points you add, and at every
+     zoom). Position them absolutely from the container's origin like MapLibre's
+     own markers, and the transform alone places them. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+
+  /* The visible dot is small, but the grabbable box is deliberately larger
+     (transparent padding around it) so a press near the dot reliably lands on
+     the marker and starts a drag — instead of leaking onto the route line
+     underneath and inserting a new point. */
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+.rm-marker:active {
+  cursor: grabbing;
+}
+
+.rm-marker__dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #ff3b30; /* systemRed waypoint, ties to the route line */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.rm-marker:hover .rm-marker__dot {
+  transform: scale(1.25);
+}
+
+.rm-marker--start .rm-marker__dot {
+  width: 16px;
+  height: 16px;
+  background: #34c759; /* systemGreen start */
+  border-color: #ffffff;
+}
+.rm-marker--end .rm-marker__dot {
+  width: 16px;
+  height: 16px;
+  background: #ff3b30; /* systemRed finish */
+  border-color: #ffffff;
+}
+.rm-marker--selected .rm-marker__dot {
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.9), 0 1px 6px rgba(0, 0, 0, 0.3);
+  transform: scale(1.2);
+}
+
+/* "You are here" dot — a precise Google-style location marker. Must be
+   position:absolute for the same reason as .rm-marker (custom MapLibre marker
+   elements get no positioning class), or it would drift from its coordinate. */
+.rm-user-location {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ff3b30; /* systemRed "you are here" */
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 59, 48, 0.35), 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Center crosshair — shows where the keyboard "Space adds a point" lands.
+   Only visible while the map has focus, so it doesn't clutter mouse use. */
+.rm-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+.rm-wrapper:focus-within .rm-crosshair {
+  opacity: 0.8;
+}
+.rm-crosshair::before,
+.rm-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(15, 23, 42, 0.7);
+}
+.rm-crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+.rm-crosshair::after {
+  top: 50%;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  transform: translateY(-50%);
+}
+
+/* Keep MapLibre's default focus ring crisp on the canvas for a11y. */
+.rm-wrapper .maplibregl-canvas:focus-visible {
+  outline: 2px solid #ff3b30;
+  outline-offset: -2px;
+}

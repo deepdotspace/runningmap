@@ -1,0 +1,13 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+.deepspace
+.worker-bundle.js
+*.tgz
+
+# Test artifacts
+test-results
+
+# Local Claude Code settings (per-developer)
+.claude/settings.local.json
