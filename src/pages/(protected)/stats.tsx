@@ -35,6 +35,7 @@ import {
   formatYmdPretty,
   parseLocalDate,
   records,
+  toYmd,
   totals,
   type DayBucket,
   type RunLike,
@@ -70,6 +71,32 @@ function dist(meters: number, unit: Unit, decimals: number): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })
+}
+
+/**
+ * Daily distance buckets for the current calendar week, Sunday → Saturday, so
+ * the weekday axis reads S M T W T F S. Days later in the week than today are
+ * kept (empty) so the week always shows its full Sun–Sat shape.
+ */
+function currentWeekDays(runs: RunLike[], now: Date): DayBucket[] {
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+  const buckets: DayBucket[] = []
+  const indexByKey = new Map<number, number>()
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i)
+    indexByKey.set(d.getTime(), i)
+    buckets.push({ date: toYmd(d), distanceMeters: 0, runCount: 0 })
+  }
+  for (const r of runs) {
+    const d = parseLocalDate(r.date)
+    if (!d) continue
+    const idx = indexByKey.get(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime())
+    if (idx != null) {
+      buckets[idx].distanceMeters += r.distanceMeters || 0
+      buckets[idx].runCount += 1
+    }
+  }
+  return buckets
 }
 
 export default function StatsPage() {
@@ -116,14 +143,17 @@ export default function StatsPage() {
     [runs],
   )
 
-  const { all, streak, week, days, longestMeters } = useMemo(() => {
+  const { all, streak, week, days, weekDays, longestMeters } = useMemo(() => {
     const now = new Date()
-    const dayBuckets = dailyBuckets(runLikes, 7, now)
+    const wd = currentWeekDays(runLikes, now)
     return {
       all: totals(runLikes),
       streak: currentStreak(runLikes, now),
-      week: dayBuckets.reduce((sum, b) => sum + b.distanceMeters, 0),
-      days: dayBuckets,
+      // "This week" + goal ring track the current Sun–Sat calendar week.
+      week: wd.reduce((sum, b) => sum + b.distanceMeters, 0),
+      // Hero sparkline stays a rolling 7-day trend.
+      days: dailyBuckets(runLikes, 7, now),
+      weekDays: wd,
       longestMeters: records(runLikes).longest?.distanceMeters ?? 0,
     }
   }, [runLikes])
@@ -265,7 +295,7 @@ export default function StatsPage() {
                   goalPct={goalPct}
                   onEditGoal={() => setEditingGoal(true)}
                 />
-                <WeekBars days={days} unit={unit} />
+                <WeekBars days={weekDays} unit={unit} />
               </div>
             </div>
           </section>
@@ -483,7 +513,9 @@ function GoalRing({
   goalPct: number
   onEditGoal: () => void
 }) {
-  const r = 112
+  // Radius + half the 20px stroke must stay within the 240-unit viewBox (≤120
+  // from the centre) or the ring clips at the top/bottom/left/right.
+  const r = 108
   const circ = 2 * Math.PI * r
   const offset = circ * (1 - goalPct / 100)
   return (
@@ -594,18 +626,18 @@ function Sparkline({ days, unit }: { days: DayBucket[]; unit: Unit }) {
 
 function WeekBars({ days, unit }: { days: DayBucket[]; unit: Unit }) {
   const max = Math.max(...days.map((b) => b.distanceMeters), 1)
-  const todayIdx = days.length - 1
+  const todayYmd = toYmd()
   return (
     <div className="flex-[2] basis-[340px] rounded-[28px] bg-card px-8 py-8 shadow-sm">
       <div className="flex items-baseline justify-between">
-        <div className="text-lg font-semibold tracking-[-0.01em] text-foreground">Last 7 days</div>
+        <div className="text-lg font-semibold tracking-[-0.01em] text-foreground">This week</div>
         <div className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
           {unit} / day
         </div>
       </div>
       <div className="mt-7 flex h-[210px] items-end justify-between gap-2.5">
-        {days.map((b, i) => {
-          const isToday = i === todayIdx
+        {days.map((b) => {
+          const isToday = b.date === todayYmd
           const pct = b.distanceMeters > 0 ? Math.max(8, Math.round((b.distanceMeters / max) * 100)) : 4
           const letter = DAY_LETTERS[(parseLocalDate(b.date)?.getDay() ?? 0)]
           const label = `${formatYmdPretty(b.date)}: ${dist(b.distanceMeters, unit, 1)} ${unit}`

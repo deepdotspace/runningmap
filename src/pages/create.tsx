@@ -310,51 +310,53 @@ export default function CreatePage() {
       {/* First-run guidance over an empty map */}
       {points.length === 0 && <PlannerHint />}
 
-      {/* Top-right: place search, tucked under the profile pill. Sits in the
-          right corner alongside the account menu, clear of the left-edge tools. */}
-      <div className="pointer-events-none absolute right-3 top-[4.5rem] z-10 flex flex-col items-end gap-2">
-        <SearchBox
-          onPick={(r) => {
-            // Drop a waypoint at the exact searched spot and fly there — the
-            // dropped pin + recentre make it unmistakable without auto-selecting
-            // it (auto-select would pop the point panel over the centre of the map).
-            route.addPointAt({ lat: r.lat, lng: r.lng })
-            mapRef.current?.flyTo(r.lat, r.lng, 16)
-          }}
-          getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
-        />
-      </div>
+      {/* Top overlay — place search + map tools. On phones they stack (search on
+          top, full width; tools beneath) so nothing overlaps; from `sm` up they
+          split to the left/right corners under the nav. The nav's mobile menu
+          (z-50) overlays these when opened. */}
+      <div className="pointer-events-none absolute inset-x-3 top-[4.5rem] z-10 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        {/* Map tools — discover parks, draw a shape, plan a route. */}
+        <div className="order-2 flex flex-col items-start gap-2 sm:order-1">
+          <DiscoverPanel
+            getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
+            onFlyTo={(lat, lng, zoom) => mapRef.current?.flyTo(lat, lng, zoom)}
+            onPickPlace={(lat, lng) => {
+              // Drop a waypoint at the park and fly there — but don't auto-select
+              // it, so picking a park no longer pops the point panel mid-map.
+              route.addPointAt({ lat, lng })
+              mapRef.current?.flyTo(lat, lng, 16)
+            }}
+            unit={route.core.unit}
+          />
+          <ShapePanel
+            getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
+            onDraw={handleShapeDraw}
+            unit={route.core.unit}
+          />
+          <RoutePlannerPanel
+            getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
+            onGenerate={handlePlanGenerate}
+            unit={route.core.unit}
+            mode={route.core.defaultMode}
+            // Only let the user generate once they've zoomed/panned to a real area
+            // (search, geolocation, or manual nav all lift the zoom well past this).
+            ready={mapZoom >= MIN_PLAN_ZOOM}
+          />
+        </div>
 
-      {/* Top-left: tools that aren't search — discover parks + draw a shape.
-          Sits directly under the title block (same top as the right-edge search
-          row) so the two corners line up and there's no gap as the viewport
-          narrows. The nav's mobile menu (z-50) overlays these when opened. */}
-      <div className="pointer-events-none absolute left-3 top-[4.5rem] z-10 flex flex-col items-start gap-2">
-        <DiscoverPanel
-          getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
-          onFlyTo={(lat, lng, zoom) => mapRef.current?.flyTo(lat, lng, zoom)}
-          onPickPlace={(lat, lng) => {
-            // Drop a waypoint at the park and fly there — but don't auto-select
-            // it, so picking a park no longer pops the point panel mid-map.
-            route.addPointAt({ lat, lng })
-            mapRef.current?.flyTo(lat, lng, 16)
-          }}
-          unit={route.core.unit}
-        />
-        <ShapePanel
-          getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
-          onDraw={handleShapeDraw}
-          unit={route.core.unit}
-        />
-        <RoutePlannerPanel
-          getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
-          onGenerate={handlePlanGenerate}
-          unit={route.core.unit}
-          mode={route.core.defaultMode}
-          // Only let the user generate once they've zoomed/panned to a real area
-          // (search, geolocation, or manual nav all lift the zoom well past this).
-          ready={mapZoom >= MIN_PLAN_ZOOM}
-        />
+        {/* Place search — full width on phones, right-aligned on wider screens. */}
+        <div className="order-1 flex flex-col items-stretch sm:order-2 sm:items-end">
+          <SearchBox
+            onPick={(r) => {
+              // Drop a waypoint at the exact searched spot and fly there — the
+              // dropped pin + recentre make it unmistakable without auto-selecting
+              // it (auto-select would pop the point panel over the centre of the map).
+              route.addPointAt({ lat: r.lat, lng: r.lng })
+              mapRef.current?.flyTo(r.lat, r.lng, 16)
+            }}
+            getCenter={() => mapRef.current?.getCenter() ?? DEFAULT_CENTER}
+          />
+        </div>
       </div>
 
       {/* Selected point controls — only shown when the user deliberately taps a

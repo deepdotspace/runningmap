@@ -68,7 +68,7 @@ export function SearchBox({ onPick, getCenter }: SearchBoxProps) {
   }, [])
 
   return (
-    <div ref={boxRef} className="pointer-events-auto relative w-72 max-w-[80vw]">
+    <div ref={boxRef} className="pointer-events-auto relative w-full sm:w-72 sm:max-w-[80vw]">
       <div className="flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-2 shadow-lg backdrop-blur-md focus-within:border-primary">
         {status === 'loading' ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
